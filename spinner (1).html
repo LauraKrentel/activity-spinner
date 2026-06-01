@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Activity Spinner</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f4f0;
+    color: #1a1a18;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 3rem;
+  }
+  h1 { font-size: 18px; font-weight: 500; color: #444441; margin-bottom: 2rem; letter-spacing: 0.02em; }
+  .layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    justify-content: center;
+    align-items: flex-start;
+    width: 100%;
+    max-width: 740px;
+  }
+  .sidebar { flex: 1; min-width: 220px; max-width: 260px; display: flex; flex-direction: column; gap: 1.5rem; }
+  .editor-label {
+    font-size: 12px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #888780; margin-bottom: 10px;
+  }
+  .items-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .item-row { display: flex; gap: 6px; align-items: center; }
+  .item-row input {
+    flex: 1; font-size: 14px; padding: 8px 10px;
+    border: 0.5px solid #ccc; border-radius: 8px;
+    background: #fff; color: #1a1a18; outline: none; font-family: inherit;
+  }
+  .item-row input:focus { border-color: #888; }
+  .remove-btn {
+    background: none; border: none; cursor: pointer;
+    color: #aaa; font-size: 18px; line-height: 1; padding: 4px 6px; border-radius: 6px;
+  }
+  .remove-btn:hover { color: #555; background: #eee; }
+  .add-btn {
+    font-size: 13px; color: #888; background: none;
+    border: 0.5px dashed #ccc; border-radius: 8px;
+    padding: 8px 12px; cursor: pointer; width: 100%; text-align: left; font-family: inherit;
+  }
+  .add-btn:hover { background: #eee; }
+
+  /* Deck controls */
+  .deck-section {}
+  .deck-name-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  .deck-name-row input {
+    flex: 1; font-size: 13px; padding: 7px 10px;
+    border: 0.5px solid #ccc; border-radius: 8px;
+    background: #fff; color: #1a1a18; outline: none; font-family: inherit;
+  }
+  .deck-name-row input:focus { border-color: #888; }
+  .save-deck-btn {
+    font-size: 13px; padding: 7px 14px;
+    border: 0.5px solid #ccc; border-radius: 8px;
+    background: #fff; color: #1a1a18; cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .save-deck-btn:hover { background: #f0efe9; }
+  .saved-list { display: flex; flex-direction: column; gap: 5px; }
+  .saved-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 10px; border: 0.5px solid #ddd; border-radius: 8px;
+    background: #fff; cursor: pointer; font-size: 13px; color: #1a1a18;
+  }
+  .saved-item:hover { background: #f0efe9; border-color: #bbb; }
+  .saved-item.active { border-color: #534AB7; background: #EEEDFE; color: #3C3489; }
+  .saved-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .delete-deck-btn {
+    background: none; border: none; cursor: pointer;
+    color: #aaa; font-size: 15px; line-height: 1; padding: 2px 4px; border-radius: 4px; flex-shrink: 0;
+  }
+  .delete-deck-btn:hover { color: #c00; background: #fee; }
+  .no-decks { font-size: 13px; color: #aaa; }
+
+  /* Wheel area */
+  .wheel-area { display: flex; flex-direction: column; align-items: center; gap: 1.2rem; }
+  .wheel-wrap { position: relative; width: 280px; height: 280px; }
+  #wheel { width: 280px; height: 280px; border-radius: 50%; }
+  .pointer {
+    position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 12px solid transparent; border-right: 12px solid transparent;
+    border-top: 24px solid #2c2c2a;
+  }
+  .spin-btn {
+    font-size: 15px; font-weight: 500; padding: 12px 44px;
+    border: 0.5px solid #ccc; border-radius: 999px;
+    background: #fff; color: #1a1a18; cursor: pointer; font-family: inherit; letter-spacing: 0.01em;
+  }
+  .spin-btn:hover { background: #f0efe9; }
+  .spin-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .result { font-size: 20px; font-weight: 500; color: #1a1a18; min-height: 28px; text-align: center; transition: opacity 0.3s; }
+  .result.hidden { opacity: 0; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #2c2c2a; color: #fff; font-size: 13px; padding: 8px 18px;
+    border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<h1>Activity Spinner</h1>
+<div class="layout">
+  <div class="sidebar">
+    <!-- Activities editor -->
+    <div class="editor">
+      <div class="editor-label">Activities</div>
+      <div class="items-list" id="items-list"></div>
+      <button class="add-btn" onclick="addItem()">+ Add activity</button>
+    </div>
+
+    <!-- Saved decks -->
+    <div class="deck-section">
+      <div class="editor-label">Saved decks</div>
+      <div class="deck-name-row">
+        <input type="text" id="deck-name" placeholder="Deck name…" />
+        <button class="save-deck-btn" onclick="saveDeck()">Save</button>
+      </div>
+      <div class="saved-list" id="saved-list"></div>
+    </div>
+  </div>
+
+  <div class="wheel-area">
+    <div class="wheel-wrap">
+      <canvas id="wheel" width="280" height="280"></canvas>
+      <div class="pointer"></div>
+    </div>
+    <button class="spin-btn" id="spin-btn" onclick="spin()">Spin</button>
+    <div class="result hidden" id="result"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const COLORS = ['#EEEDFE','#E1F5EE','#FAECE7','#FBEAF0','#E6F1FB','#EAF3DE','#FAEEDA','#FCEBEB'];
+const STROKE = ['#534AB7','#0F6E56','#993C1D','#993556','#185FA5','#3B6D11','#854F0B','#A32D2D'];
+const TEXT_C = ['#3C3489','#085041','#712B13','#72243E','#0C447C','#27500A','#633806','#791F1F'];
+
+let items = ['Read aloud','Word sort','Flashcards','Whiteboard','Build a word','Partner quiz'];
+let spinning = false;
+let currentAngle = 0;
+let activeDeckName = null;
+let audioCtx = null;
+let lastTickAngle = 0;
+
+// --- Audio ---
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTick(volume) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(1200, ctx.currentTime);
+    gain.gain.setValueAtTime(Math.min(volume, 0.35), ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.04);
+  } catch(e) {}
+}
+
+function playWinSound() {
+  try {
+    const ctx = getAudioCtx();
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.1);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.25);
+      osc.start(ctx.currentTime + i * 0.1);
+      osc.stop(ctx.currentTime + i * 0.1 + 0.25);
+    });
+  } catch(e) {}
+}
+
+// --- List rendering ---
+function renderList() {
+  const list = document.getElementById('items-list');
+  list.innerHTML = '';
+  items.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = item;
+    input.addEventListener('input', () => { items[i] = input.value; drawWheel(); });
+    const btn = document.createElement('button');
+    btn.className = 'remove-btn';
+    btn.textContent = '×';
+    btn.setAttribute('aria-label', 'Remove');
+    btn.addEventListener('click', () => removeItem(i));
+    row.appendChild(input);
+    row.appendChild(btn);
+    list.appendChild(row);
+  });
+  drawWheel();
+}
+
+function addItem() {
+  items.push('');
+  renderList();
+  const inputs = document.querySelectorAll('.item-row input');
+  inputs[inputs.length - 1].focus();
+}
+
+function removeItem(i) {
+  if (items.length <= 2) return;
+  items.splice(i, 1);
+  renderList();
+}
+
+// --- Wheel drawing ---
+function drawWheel(highlightIndex = -1) {
+  const canvas = document.getElementById('wheel');
+  const ctx = canvas.getContext('2d');
+  const cx = 140, cy = 140, r = 136;
+  ctx.clearRect(0, 0, 280, 280);
+  const valid = items.filter(s => s.trim());
+  if (!valid.length) return;
+  const arc = (2 * Math.PI) / valid.length;
+  valid.forEach((label, i) => {
+    const start = i * arc - Math.PI / 2;
+    const end = start + arc;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, end);
+    ctx.closePath();
+    ctx.fillStyle = highlightIndex === i ? STROKE[i % STROKE.length] : COLORS[i % COLORS.length];
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(start + arc / 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = highlightIndex === i ? '#fff' : TEXT_C[i % TEXT_C.length];
+    const fontSize = valid.length > 6 ? 11 : 13;
+    ctx.font = `500 ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    const maxW = r - 24;
+    let text = label;
+    if (ctx.measureText(text).width > maxW) {
+      while (ctx.measureText(text + '…').width > maxW && text.length > 1) text = text.slice(0, -1);
+      text += '…';
+    }
+    ctx.fillText(text, r - 10, fontSize / 3);
+    ctx.restore();
+  });
+  ctx.beginPath();
+  ctx.arc(cx, cy, 18, 0, 2 * Math.PI);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+// --- Spin ---
+function spin() {
+  if (spinning) return;
+  const valid = items.filter(s => s.trim());
+  if (valid.length < 2) return;
+  spinning = true;
+  getAudioCtx(); // unlock audio context on user gesture
+  const btn = document.getElementById('spin-btn');
+  btn.disabled = true;
+  const resultEl = document.getElementById('result');
+  resultEl.className = 'result hidden';
+  const extraSpins = (5 + Math.floor(Math.random() * 5)) * 360;
+  const targetDeg = Math.random() * 360;
+  const totalDeg = extraSpins + targetDeg;
+  const duration = 3000 + Math.random() * 1000;
+  const startAngle = currentAngle;
+  const startTime = performance.now();
+  lastTickAngle = currentAngle;
+  const segmentDeg = 360 / valid.length;
+
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function frame(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const easedProgress = easeOut(progress);
+    currentAngle = startAngle + totalDeg * easedProgress;
+
+    // Tick sound each time pointer crosses a segment boundary
+    const speed = totalDeg * (1 - Math.pow(1 - progress, 2)) / duration * 16; // approx deg/frame
+    const angleDiff = currentAngle - lastTickAngle;
+    if (angleDiff >= segmentDeg) {
+      const volume = Math.min(speed / 12, 0.35);
+      playTick(volume);
+      lastTickAngle = currentAngle;
+    }
+
+    document.getElementById('wheel').style.transform = `rotate(${currentAngle}deg)`;
+
+    if (progress < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      spinning = false;
+      btn.disabled = false;
+      const norm = ((currentAngle % 360) + 360) % 360;
+      const arc = 360 / valid.length;
+      const winnerIndex = Math.floor(((360 - norm + 90) % 360) / arc) % valid.length;
+      drawWheel(winnerIndex);
+      document.getElementById('wheel').style.transform = `rotate(${currentAngle}deg)`;
+      resultEl.textContent = valid[winnerIndex];
+      resultEl.className = 'result';
+      playWinSound();
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+// --- Saved decks (localStorage) ---
+function getDecks() {
+  try { return JSON.parse(localStorage.getItem('spinner_decks') || '{}'); } catch(e) { return {}; }
+}
+
+function setDecks(decks) {
+  localStorage.setItem('spinner_decks', JSON.stringify(decks));
+}
+
+function saveDeck() {
+  const nameInput = document.getElementById('deck-name');
+  const name = nameInput.value.trim();
+  if (!name) { showToast('Enter a deck name first'); return; }
+  const valid = items.filter(s => s.trim());
+  if (valid.length < 2) { showToast('Add at least 2 activities'); return; }
+  const decks = getDecks();
+  decks[name] = [...valid];
+  setDecks(decks);
+  activeDeckName = name;
+  nameInput.value = '';
+  renderDecks();
+  showToast(`Saved "${name}"`);
+}
+
+function loadDeck(name) {
+  const decks = getDecks();
+  if (!decks[name]) return;
+  items = [...decks[name]];
+  activeDeckName = name;
+  currentAngle = 0;
+  document.getElementById('wheel').style.transform = 'rotate(0deg)';
+  document.getElementById('result').className = 'result hidden';
+  renderList();
+  renderDecks();
+}
+
+function deleteDeck(name) {
+  const decks = getDecks();
+  delete decks[name];
+  setDecks(decks);
+  if (activeDeckName === name) activeDeckName = null;
+  renderDecks();
+  showToast(`Deleted "${name}"`);
+}
+
+function renderDecks() {
+  const container = document.getElementById('saved-list');
+  const decks = getDecks();
+  const names = Object.keys(decks);
+  container.innerHTML = '';
+  if (!names.length) {
+    container.innerHTML = '<div class="no-decks">No saved decks yet</div>';
+    return;
+  }
+  names.forEach(name => {
+    const row = document.createElement('div');
+    row.className = 'saved-item' + (name === activeDeckName ? ' active' : '');
+    const label = document.createElement('span');
+    label.textContent = name;
+    label.title = name;
+    label.style.cursor = 'pointer';
+    label.addEventListener('click', () => loadDeck(name));
+    const del = document.createElement('button');
+    del.className = 'delete-deck-btn';
+    del.textContent = '×';
+    del.setAttribute('aria-label', 'Delete deck');
+    del.addEventListener('click', (e) => { e.stopPropagation(); deleteDeck(name); });
+    row.appendChild(label);
+    row.appendChild(del);
+    container.appendChild(row);
+  });
+}
+
+// --- Toast ---
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// --- Init ---
+renderList();
+renderDecks();
+</script>
+</body>
+</html>
